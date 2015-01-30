@@ -2,8 +2,9 @@ package beanstalk_test
 
 import (
 	"fmt"
-	"github.com/kr/beanstalk"
 	"time"
+
+	"github.com/xuoe/beanstalk"
 )
 
 func Example() {
@@ -12,7 +13,7 @@ func Example() {
 		panic(err)
 	}
 	c.Put([]byte("hello"), 1, 0, 120*time.Second)
-	id, body, err := c.Reserve(5 * time.Second)
+	id, body, err := c.ReserveWithTimeout(5 * time.Second)
 	if err != nil {
 		panic(err)
 	}
@@ -20,12 +21,12 @@ func Example() {
 	fmt.Println(string(body))
 }
 
-func ExampleTubeSet_Reserve() {
+func ExampleTubeSet_ReserveWithTimeout() {
 	c, err := beanstalk.Dial("tcp", "127.0.0.1:11300")
 	if err != nil {
 		panic(err)
 	}
-	id, body, err := c.Reserve(10 * time.Hour)
+	id, body, err := c.ReserveWithTimeout(10 * time.Hour)
 	if cerr, ok := err.(beanstalk.ConnError); ok && cerr.Err == beanstalk.ErrTimeout {
 		fmt.Println("timed out")
 		return

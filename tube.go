@@ -126,10 +126,11 @@ func (t *Tube) flush(peek peekFunc) error {
 
 type flushFunc func() error
 
-// Flush flushes tube `t' in its entirety.
+// Flush flushes tube `t` in its entirety.
 //
 // It is meant as a convenience for calling FlushReady, FlushDelayed, and
-// FlushBuried sequentially.
+// FlushBuried sequentially. If any of those functions fails with an error,
+// Flush returns that error.
 func (t *Tube) Flush() error {
 	for _, flush := range []flushFunc{t.FlushReady, t.FlushDelayed, t.FlushBuried} {
 		if err := flush(); err != nil {
