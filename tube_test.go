@@ -1,6 +1,8 @@
 package beanstalk
 
 import (
+	"bytes"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -70,6 +72,123 @@ func TestTubePeekBuried(t *testing.T) {
 		t.Fatalf("bad body, expected %#v, got %#v", "x", string(body))
 	}
 	if err = c.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTubeFlushReady(t *testing.T) {
+	var (
+		cmd   bytes.Buffer
+		res   bytes.Buffer
+		count = 10
+	)
+
+	for i := 1; i <= count; i++ {
+		cmd.WriteString("put 0 0 0 3\r\nfoo\r\n")
+		res.WriteString(fmt.Sprintf("INSERTED %d\r\n", i))
+	}
+
+	for i := 1; i <= count; i++ {
+		cmd.WriteString("peek-ready\r\n")
+		res.WriteString(fmt.Sprintf("FOUND %d 3\r\nfoo\r\n", i))
+		cmd.WriteString(fmt.Sprintf("delete %d\r\n", i))
+		res.WriteString("DELETED\r\n")
+	}
+
+	c := NewConn(mock(cmd.String(), res.String()))
+
+	for i := 0; i < count; i++ {
+		_, err := c.Put([]byte("foo"), 0, 0, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := c.FlushReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTubeFlushDelayed(t *testing.T) {
+	var (
+		cmd   bytes.Buffer
+		res   bytes.Buffer
+		count = 10
+	)
+
+	for i := 1; i <= count; i++ {
+		cmd.WriteString("put 0 0 0 3\r\nfoo\r\n")
+		res.WriteString(fmt.Sprintf("INSERTED %d\r\n", i))
+	}
+
+	for i := 1; i <= count; i++ {
+		cmd.WriteString("peek-delayed\r\n")
+		res.WriteString(fmt.Sprintf("FOUND %d 3\r\nfoo\r\n", i))
+		cmd.WriteString(fmt.Sprintf("delete %d\r\n", i))
+		res.WriteString("DELETED\r\n")
+	}
+
+	c := NewConn(mock(cmd.String(), res.String()))
+
+	for i := 0; i < count; i++ {
+		_, err := c.Put([]byte("foo"), 0, 0, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := c.FlushDelayed(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTubeFlushBuried(t *testing.T) {
+	var (
+		cmd   bytes.Buffer
+		res   bytes.Buffer
+		count = 10
+	)
+
+	for i := 1; i <= count; i++ {
+		cmd.WriteString("put 0 0 0 3\r\nfoo\r\n")
+		res.WriteString(fmt.Sprintf("INSERTED %d\r\n", i))
+		cmd.WriteString(fmt.Sprintf("bury %d 0\r\n", i))
+		res.WriteString("BURIED\r\n")
+	}
+
+	for i := 1; i <= count; i++ {
+		cmd.WriteString("peek-buried\r\n")
+		res.WriteString(fmt.Sprintf("FOUND %d 3\r\nfoo\r\n", i))
+		cmd.WriteString(fmt.Sprintf("delete %d\r\n", i))
+		res.WriteString("DELETED\r\n")
+	}
+
+	c := NewConn(mock(cmd.String(), res.String()))
+
+	for i := 1; i <= count; i++ {
+		_, err := c.Put([]byte("foo"), 0, 0, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = c.Bury(uint64(i), 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := c.FlushBuried(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.Close(); err != nil {
 		t.Fatal(err)
 	}
 }

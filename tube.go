@@ -1,8 +1,6 @@
 package beanstalk
 
-import (
-	"time"
-)
+import "time"
 
 // Tube represents tube Name on the server connected to by Conn.
 // It has methods for commands that operate on a single tube.
@@ -11,7 +9,7 @@ type Tube struct {
 	Name string
 }
 
-// Put puts a job into tube t with priority pri and TTR ttr, and returns
+// Put puts a job into tube `t` with priority pri and TTR ttr, and returns
 // the id of the newly-created job. If delay is nonzero, the server will
 // wait the given amount of time after returning to the client and before
 // putting the job into the ready queue.
@@ -94,7 +92,54 @@ func (t *Tube) KickJob(id uint64) error {
 	return err
 }
 
-// Stats retrieves statistics about tube t.
+// FlushReady deletes all jobs residing in the "ready" queue.
+func (t *Tube) FlushReady() error {
+	return t.flush(t.PeekReady)
+}
+
+// FlushDelayed deletes all jobs residing in the "delayed" queue.
+func (t *Tube) FlushDelayed() error {
+	return t.flush(t.PeekDelayed)
+}
+
+// FlushBuried deletes all jobs residing in the holding area.
+func (t *Tube) FlushBuried() error {
+	return t.flush(t.PeekBuried)
+}
+
+type peekFunc func() (uint64, []byte, error)
+
+func (t *Tube) flush(peek peekFunc) error {
+	for {
+		id, _, err := peek()
+		if err != nil {
+			if id == 0 {
+				return nil
+			}
+			return err
+		}
+		if err = t.Conn.Delete(id); err != nil {
+			return err
+		}
+	}
+}
+
+type flushFunc func() error
+
+// Flush flushes tube `t' in its entirety.
+//
+// It is meant as a convenience for calling FlushReady, FlushDelayed, and
+// FlushBuried sequentially.
+func (t *Tube) Flush() error {
+	for _, flush := range []flushFunc{t.FlushReady, t.FlushDelayed, t.FlushBuried} {
+		if err := flush(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Stats retrieves statistics about tube `t`.
 func (t *Tube) Stats() (map[string]string, error) {
 	r, err := t.Conn.cmd(nil, nil, nil, "stats-tube", t.Name)
 	if err != nil {
