@@ -80,7 +80,7 @@ func TestWatchIgnore(t *testing.T) {
 		"WATCHING 2\r\nWATCHING 1\r\nRESERVED 1 1\r\nx\r\n",
 	))
 	ts := NewTubeSet(c, "foo")
-	id, body, err := ts.Reserve(time.Second)
+	id, body, err := ts.ReserveWithTimeout(time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
